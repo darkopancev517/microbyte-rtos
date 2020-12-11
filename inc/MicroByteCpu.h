@@ -10,27 +10,23 @@ namespace microbyte {
 
 class MicroByteCpu
 {
-    protected:
-
-    unsigned irqState;
-
     public:
 
-    MicroByteCpu()
+    MicroByteCpu();
+
+    virtual unsigned disableIrq()
     {
-        this->irqState = 0;
+        return 0;
     }
 
-    virtual void disableIrq()
+    virtual unsigned enableIrq()
     {
+        return 0;
     }
 
-    virtual void enableIrq()
+    virtual void restoreIrq(unsigned state)
     {
-    }
-
-    virtual void restoreIrq()
-    {
+        (void)state;
     }
 
     virtual int inIsr()
@@ -75,9 +71,7 @@ class MicroByteCpu
     }
 };
 
-void cpuSet(MicroByteCpu *cpu);
-
-MicroByteCpu *cpuGet();
+extern MicroByteCpu *uByteCpu;
 
 } // namespace microbyte
 

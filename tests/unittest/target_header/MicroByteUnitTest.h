@@ -18,11 +18,11 @@ class MicroByteCpuTest : public MicroByteCpu
         contextSwitchState = 0;
     }
 
-    void disableIrq(void);
+    unsigned disableIrq(void);
 
-    void enableIrq(void);
+    unsigned enableIrq(void);
 
-    void restoreIrq(void);
+    void restoreIrq(unsigned state);
 
     int inIsr(void);
 

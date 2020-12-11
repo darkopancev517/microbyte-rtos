@@ -5,7 +5,7 @@ namespace microbyte {
 Mutex::Mutex()
     : queue()
 {
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
     this->scheduler = &ThreadScheduler::get();
 }
 
@@ -13,17 +13,17 @@ Mutex::Mutex(CircList *locked)
     : queue()
 {
     this->queue.next = locked;
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
     this->scheduler = &ThreadScheduler::get();
 }
 
 int Mutex::setLock(int blocking)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (queue.next == NULL)
     {
         queue.next = MICROBYTE_MUTEX_LOCKED;
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return 1;
     }
     else if (blocking)
@@ -39,42 +39,42 @@ int Mutex::setLock(int blocking)
         {
             curThread->addTo(&queue);
         }
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         cpu->triggerContextSwitch();
         return 1;
     }
     else
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return 0;
     }
 }
 
 ThreadPid Mutex::peek()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (queue.next == NULL || queue.next == MICROBYTE_MUTEX_LOCKED)
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return MICROBYTE_THREAD_PID_UNDEF;
     }
     Thread *thread = Thread::get(queue.next);
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     return thread->pid;
 }
 
 void Mutex::unlock()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (queue.next == NULL)
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return;
     }
     if (queue.next == MICROBYTE_MUTEX_LOCKED)
     {
         queue.next = NULL;
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return;
     }
     CircList *head = queue.next;
@@ -85,13 +85,13 @@ void Mutex::unlock()
     {
         queue.next = MICROBYTE_MUTEX_LOCKED;
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     scheduler->contextSwitch(thread->priority);
 }
 
 void Mutex::unlockAndSleep()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (queue.next)
     {
         if (queue.next == MICROBYTE_MUTEX_LOCKED)
@@ -110,7 +110,7 @@ void Mutex::unlockAndSleep()
             }
         }
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     scheduler->sleep();
 }
 

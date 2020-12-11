@@ -8,17 +8,17 @@ Msg::Msg()
 {
     this->content.ptr = NULL;
     this->content.value = 0;
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
     this->scheduler = &ThreadScheduler::get();
 }
 
-int Msg::send(ThreadPid targetPid, int blocking)
+int Msg::send(ThreadPid targetPid, int blocking, unsigned state)
 {
     Thread *targetThread = scheduler->threadFromContainer(targetPid);
     senderPid = scheduler->activePid();
     if (targetThread == NULL || !targetThread->hasMsgQueue())
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1;
     }
     Thread *curThread = scheduler->activeThread();
@@ -26,7 +26,7 @@ int Msg::send(ThreadPid targetPid, int blocking)
     {
         if (targetThread->queuedMsg(this))
         {
-            cpu->restoreIrq();
+            cpu->restoreIrq(state);
             if (curThread->getStatus() == MICROBYTE_THREAD_STATUS_REPLY_BLOCKED)
             {
                 cpu->triggerContextSwitch();
@@ -35,7 +35,7 @@ int Msg::send(ThreadPid targetPid, int blocking)
         }
         if (!blocking)
         {
-            cpu->restoreIrq();
+            cpu->restoreIrq(state);
             return 0;
         }
         curThread->waitData = static_cast<void *>(this);
@@ -50,7 +50,7 @@ int Msg::send(ThreadPid targetPid, int blocking)
         }
         scheduler->setThreadStatus(curThread, newStatus);
         curThread->addTo(reinterpret_cast<CircList *>(&targetThread->msgWaiters));
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         cpu->triggerContextSwitch();
     }
     else
@@ -58,7 +58,7 @@ int Msg::send(ThreadPid targetPid, int blocking)
         Msg *targetMsg = static_cast<Msg *>(targetThread->waitData);
         *targetMsg = *this;
         scheduler->setThreadStatus(targetThread, MICROBYTE_THREAD_STATUS_PENDING);
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         cpu->triggerContextSwitch();
     }
     return 1;
@@ -66,11 +66,11 @@ int Msg::send(ThreadPid targetPid, int blocking)
 
 int Msg::receive(int blocking)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Thread *curThread = scheduler->activeThread();
     if (curThread == NULL || !curThread->hasMsgQueue())
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1;
     }
     int queueIndex = -1;
@@ -80,13 +80,13 @@ int Msg::receive(int blocking)
     }
     if (!blocking && (!curThread->msgWaiters.next && queueIndex == -1))
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1;
     }
     if (queueIndex >= 0)
     {
         *this = *static_cast<Msg *>(&curThread->msgArray[queueIndex]);
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return 1;
     }
     else
@@ -99,12 +99,12 @@ int Msg::receive(int blocking)
         if (queueIndex < 0)
         {
             scheduler->setThreadStatus(curThread, MICROBYTE_THREAD_STATUS_RECEIVE_BLOCKED);
-            cpu->restoreIrq();
+            cpu->restoreIrq(state);
             cpu->triggerContextSwitch();
         }
         else
         {
-            cpu->restoreIrq();
+            cpu->restoreIrq(state);
         }
         return 1;
     }
@@ -133,7 +133,7 @@ int Msg::receive(int blocking)
             scheduler->setThreadStatus(senderThread, MICROBYTE_THREAD_STATUS_PENDING);
             senderPrio = senderThread->priority;
         }
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         if (senderPrio < MICROBYTE_THREAD_PRIORITY_IDLE)
         {
             scheduler->contextSwitch(senderPrio);
@@ -152,7 +152,7 @@ int Msg::send(ThreadPid targetPid)
     {
         return sendToSelf();
     }
-    return send(targetPid, 1);
+    return send(targetPid, 1, cpu->disableIrq());
 }
 
 int Msg::trySend(ThreadPid targetPid)
@@ -165,21 +165,21 @@ int Msg::trySend(ThreadPid targetPid)
     {
         return sendToSelf();
     }
-    return send(targetPid, 0);
+    return send(targetPid, 0, cpu->disableIrq());
 }
 
 int Msg::sendToSelf(void)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Thread *curThread = scheduler->activeThread();
     if (curThread == NULL || !curThread->hasMsgQueue())
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1;
     }
     senderPid = curThread->pid;
     int result = curThread->queuedMsg(this);
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     return result;
 }
 
@@ -222,7 +222,7 @@ int Msg::tryReceive()
 
 int Msg::sendReceive(Msg *reply, ThreadPid targetPid)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Thread *curThread = scheduler->activeThread();
     if (curThread->pid == targetPid || !curThread->hasMsgQueue())
     {
@@ -231,24 +231,24 @@ int Msg::sendReceive(Msg *reply, ThreadPid targetPid)
     scheduler->setThreadStatus(curThread, MICROBYTE_THREAD_STATUS_REPLY_BLOCKED);
     curThread->waitData = static_cast<void *>(reply);
     *reply = *this;
-    return reply->send(targetPid, 1);
+    return reply->send(targetPid, 1, state);
 }
 
 int Msg::reply(Msg *reply)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Thread *targetThread = scheduler->threadFromContainer(senderPid);
     if (targetThread == NULL ||
         !targetThread->hasMsgQueue() ||
         targetThread->status != MICROBYTE_THREAD_STATUS_REPLY_BLOCKED)
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1;
     }
     Msg *targetMsg = static_cast<Msg *>(targetThread->waitData);
     *targetMsg = *reply;
     scheduler->setThreadStatus(targetThread, MICROBYTE_THREAD_STATUS_PENDING);
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     scheduler->contextSwitch(targetThread->priority);
     return 1;
 }

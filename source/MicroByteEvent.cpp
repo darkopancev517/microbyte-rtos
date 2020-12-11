@@ -10,7 +10,7 @@ Event::Event()
 EventQueue::EventQueue()
 {
     this->queue.next = NULL;
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
     this->scheduler = &ThreadScheduler::get();
 }
 
@@ -20,12 +20,12 @@ void EventQueue::post(Event *event, Thread *thread)
     {
         return;
     }
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (!event->node.next)
     {
         queue.rightPush(&event->node);
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     scheduler->setThreadFlags(thread, MICROBYTE_EVENT_THREAD_FLAG);
 }
 
@@ -35,17 +35,17 @@ void EventQueue::cancel(Event *event)
     {
         return;
     }
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     queue.remove(&event->node);
     event->node.next = NULL;
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
 }
 
 Event *EventQueue::get()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Event *result = reinterpret_cast<Event *>(queue.leftPop());
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     if (result)
     {
         result->node.next = NULL;
@@ -57,9 +57,9 @@ Event *EventQueue::wait()
 {
     Event *result = NULL;
 #ifdef UNITTEST
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     result = reinterpret_cast<Event *>(queue.leftPop());
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     if (result == NULL)
     {
         scheduler->waitAnyThreadFlags(MICROBYTE_EVENT_THREAD_FLAG);
@@ -67,9 +67,9 @@ Event *EventQueue::wait()
 #else
     do
     {
-        cpu->disableIrq();
+        unsigned state = cpu->disableIrq();
         result = reinterpret_cast<Event *>(queue.leftPop());
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         if (result == NULL)
         {
             scheduler->waitAnyThreadFlags(MICROBYTE_EVENT_THREAD_FLAG);

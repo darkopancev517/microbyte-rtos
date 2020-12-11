@@ -51,7 +51,6 @@ class TestMicroByteTimer : public testing::Test
     virtual void SetUp()
     {
         cpuTest = new MicroByteCpuTest();
-        microbyte::cpuSet(cpuTest);
 
         timerOperations = new TimerOperations();
         timerOperations->set = periphTimerSet;

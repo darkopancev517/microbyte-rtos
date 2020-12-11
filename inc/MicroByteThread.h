@@ -122,7 +122,7 @@ class ThreadScheduler
     Thread *nextThreadFromRunQueue();
 
     uint16_t clearThreadFlagsAtomic(Thread *thread, uint16_t mask);
-    void waitThreadFlags(uint16_t mask, Thread *thread, ThreadStatus newStatus);
+    void waitThreadFlags(uint16_t mask, Thread *thread, ThreadStatus newStatus, unsigned state);
     void waitAnyThreadFlagsBlocked(uint16_t mask);
 
     public:

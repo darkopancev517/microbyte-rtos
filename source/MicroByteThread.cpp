@@ -36,7 +36,7 @@ ThreadScheduler::ThreadScheduler()
     {
         this->runQueue[prio].next = NULL;
     }
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
 }
 
 Thread::Thread()
@@ -55,7 +55,7 @@ Thread::Thread()
     , msgQueue()
     , msgArray(NULL)
 {
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
 }
 
 Thread *Thread::init(char *stack, int size, uint8_t prio, int flags,
@@ -109,7 +109,7 @@ Thread *Thread::init(char *stack, int size, uint8_t prio, int flags,
         *(uintptr_t *)stack = reinterpret_cast<uintptr_t>(stack);
     }
 
-    thread->cpu->disableIrq();
+    unsigned state = thread->cpu->disableIrq();
 
     ThreadPid pid = MICROBYTE_THREAD_PID_UNDEF;
 
@@ -126,7 +126,7 @@ Thread *Thread::init(char *stack, int size, uint8_t prio, int flags,
 
     if (pid == MICROBYTE_THREAD_PID_UNDEF)
     {
-        thread->cpu->restoreIrq();
+        thread->cpu->restoreIrq(state);
         return NULL;
     }
 
@@ -152,13 +152,13 @@ Thread *Thread::init(char *stack, int size, uint8_t prio, int flags,
 
         if (!(flags & MICROBYTE_THREAD_FLAGS_WOUT_YIELD))
         {
-            thread->cpu->restoreIrq();
+            thread->cpu->restoreIrq(state);
             scheduler.contextSwitch(prio);
             return thread;
         }
     }
 
-    thread->cpu->restoreIrq();
+    thread->cpu->restoreIrq(state);
 
     return thread;
 }
@@ -242,31 +242,31 @@ Thread *ThreadScheduler::nextThreadFromRunQueue()
 
 uint16_t ThreadScheduler::clearThreadFlagsAtomic(Thread *thread, uint16_t mask)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     mask &= thread->flags;
     thread->flags &= ~mask;
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     return mask;
 }
 
-void ThreadScheduler::waitThreadFlags(uint16_t mask, Thread *thread, ThreadStatus newStatus)
+void ThreadScheduler::waitThreadFlags(uint16_t mask, Thread *thread, ThreadStatus newStatus, unsigned state)
 {
     thread->waitFlags = mask;
     setThreadStatus(thread, newStatus);
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     cpu->triggerContextSwitch();
 }
 
 void ThreadScheduler::waitAnyThreadFlagsBlocked(uint16_t mask)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (!(currentActiveThread->flags & mask))
     {
-        waitThreadFlags(mask, currentActiveThread, MICROBYTE_THREAD_STATUS_FLAG_BLOCKED_ANY);
+        waitThreadFlags(mask, currentActiveThread, MICROBYTE_THREAD_STATUS_FLAG_BLOCKED_ANY, state);
     }
     else
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
     }
 }
 
@@ -276,26 +276,26 @@ void ThreadScheduler::sleep()
     {
         return;
     }
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     setThreadStatus(currentActiveThread, MICROBYTE_THREAD_STATUS_SLEEPING);
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     cpu->triggerContextSwitch();
 }
 
 void ThreadScheduler::yield()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (currentActiveThread->status >= MICROBYTE_THREAD_STATUS_RUNNING)
     {
         runQueue[currentActiveThread->priority].leftPopRightPush();
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     cpu->triggerContextSwitch();
 }
 
 void ThreadScheduler::exit()
 {
-    cpu->disableIrq();
+    (void)cpu->disableIrq();
     threadsContainer[currentActivePid] = NULL;
     numOfThreadsInContainer -= 1;
     setThreadStatus(currentActiveThread, MICROBYTE_THREAD_STATUS_STOPPED);
@@ -305,23 +305,23 @@ void ThreadScheduler::exit()
 
 int ThreadScheduler::wakeUpThread(ThreadPid pid)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     Thread *threadToWake = threadFromContainer(pid);
     if (!threadToWake)
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return -1; // Thread wasn't in container
     }
     else if (threadToWake->status == MICROBYTE_THREAD_STATUS_SLEEPING)
     {
         setThreadStatus(threadToWake, MICROBYTE_THREAD_STATUS_PENDING);
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         contextSwitch(threadToWake->priority);
         return 1;
     }
     else
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         return 0; // Thread wasn't sleep
     }
 }
@@ -349,11 +349,11 @@ void ThreadScheduler::run()
 
 void ThreadScheduler::setThreadFlags(Thread *thread, uint16_t mask)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     thread->flags |= mask;
     if (wakeThreadFlags(thread))
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
         if (!cpu->inIsr())
         {
             cpu->triggerContextSwitch();
@@ -361,7 +361,7 @@ void ThreadScheduler::setThreadFlags(Thread *thread, uint16_t mask)
     }
     else
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
     }
 }
 
@@ -378,14 +378,14 @@ uint16_t ThreadScheduler::waitAnyThreadFlags(uint16_t mask)
 
 uint16_t ThreadScheduler::waitAllThreadFlags(uint16_t mask)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (!((currentActiveThread->flags & mask) == mask))
     {
-        waitThreadFlags(mask, currentActiveThread, MICROBYTE_THREAD_STATUS_FLAG_BLOCKED_ALL);
+        waitThreadFlags(mask, currentActiveThread, MICROBYTE_THREAD_STATUS_FLAG_BLOCKED_ALL, state);
     }
     else
     {
-        cpu->restoreIrq();
+        cpu->restoreIrq(state);
     }
     return clearThreadFlagsAtomic(currentActiveThread, mask);
 }

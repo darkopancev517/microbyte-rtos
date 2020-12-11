@@ -7,21 +7,19 @@
 
 using namespace microbyte;
 
-void MicroByteCpuTest::disableIrq(void)
+unsigned MicroByteCpuTest::disableIrq(void)
 {
-    assert(irqState == 0);
-
-    irqState = 0xff;
+    return 0;
 }
 
-void MicroByteCpuTest::enableIrq(void)
+unsigned MicroByteCpuTest::enableIrq(void)
 {
-    irqState = 0;
+    return 0;
 }
 
-void MicroByteCpuTest::restoreIrq(void)
+void MicroByteCpuTest::restoreIrq(unsigned state)
 {
-    irqState = 0;
+    (void)state;
 }
 
 int MicroByteCpuTest::inIsr(void)

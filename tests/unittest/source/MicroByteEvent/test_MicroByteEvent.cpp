@@ -35,8 +35,6 @@ TEST_F(TestMicroByteEvent, eventTest)
 {
     MicroByteCpuTest cpuTest;
 
-    microbyte::cpuSet(&cpuTest);
-
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 
     EXPECT_NE(scheduler, nullptr);

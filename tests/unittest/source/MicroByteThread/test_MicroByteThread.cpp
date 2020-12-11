@@ -22,8 +22,6 @@ TEST_F(TestMicroByteThread, basicThreadTest)
 {
     MicroByteCpuTest cpuTest;
 
-    microbyte::cpuSet(&cpuTest);
-
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 
     EXPECT_NE(scheduler, nullptr);
@@ -121,8 +119,6 @@ TEST_F(TestMicroByteThread, basicThreadTest)
 TEST_F(TestMicroByteThread, multipleThreadTest)
 {
     MicroByteCpuTest cpuTest;
-
-    microbyte::cpuSet(&cpuTest);
 
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 

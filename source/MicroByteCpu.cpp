@@ -2,16 +2,11 @@
 
 namespace microbyte {
 
-static MicroByteCpu *microByteCpu = NULL;
+MicroByteCpu *uByteCpu = NULL;
 
-void cpuSet(MicroByteCpu *cpu)
+MicroByteCpu::MicroByteCpu()
 {
-    microByteCpu = cpu;
-}
-
-MicroByteCpu *cpuGet()
-{
-    return microByteCpu;
+    uByteCpu = this;
 }
 
 } // namespace microbyte

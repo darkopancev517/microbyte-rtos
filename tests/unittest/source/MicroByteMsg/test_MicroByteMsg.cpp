@@ -23,8 +23,6 @@ TEST_F(TestMicroByteMsg, singleMsgTest)
 {
     MicroByteCpuTest cpuTest;
 
-    microbyte::cpuSet(&cpuTest);
-
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 
     EXPECT_NE(scheduler, nullptr);
@@ -493,8 +491,6 @@ TEST_F(TestMicroByteMsg, singleMsgTest)
 TEST_F(TestMicroByteMsg, multipleMsgTest)
 {
     MicroByteCpuTest cpuTest;
-
-    microbyte::cpuSet(&cpuTest);
 
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 

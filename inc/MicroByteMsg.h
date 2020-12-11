@@ -14,7 +14,7 @@ class Msg
     MicroByteCpu *cpu;
     ThreadScheduler *scheduler;
 
-    int send(ThreadPid targetPid, int blocking);
+    int send(ThreadPid targetPid, int blocking, unsigned state);
     int receive(int blocking);
 
     public:

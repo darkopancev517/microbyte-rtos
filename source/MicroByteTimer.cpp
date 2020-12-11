@@ -11,7 +11,7 @@ TimerClock::TimerClock(TimerOperations *func)
     , last(NULL)
     , adjust(0)
 {
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
 }
 
 Timer::Timer(TimerClock *clock, TimerCallback func, void *ptr)
@@ -20,7 +20,7 @@ Timer::Timer(TimerClock *clock, TimerCallback func, void *ptr)
     , arg(ptr)
 {
     this->clock = clock;
-    this->cpu = cpuGet();
+    this->cpu = uByteCpu;
 }
 
 int TimerClock::isSet(Timer *t)
@@ -37,19 +37,19 @@ int TimerClock::isSet(Timer *t)
 
 void Timer::remove()
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     if (clock->isSet(this))
     {
         clock->updateHeadOffset();
         clock->delEntryFromList(&this->base);
         clock->update();
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
 }
 
 void Timer::set(uint32_t value)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     clock->updateHeadOffset();
     if (clock->isSet(this))
     {
@@ -69,7 +69,7 @@ void Timer::set(uint32_t value)
     {
         clock->ops->set(clock, value);
     }
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
 }
 
 void TimerClock::addEntryToList(TimerBase *entry)
@@ -237,11 +237,11 @@ void TimerClock::sleep(uint32_t duration)
 
 void TimerClock::periodicWakeup(uint32_t *lastWakeup, uint32_t period)
 {
-    cpu->disableIrq();
+    unsigned state = cpu->disableIrq();
     uint32_t clockNow = now();
     uint32_t target = *lastWakeup + period;
     uint32_t offset = target - clockNow;
-    cpu->restoreIrq();
+    cpu->restoreIrq(state);
     if (offset <= period)
     {
         sleep(offset);

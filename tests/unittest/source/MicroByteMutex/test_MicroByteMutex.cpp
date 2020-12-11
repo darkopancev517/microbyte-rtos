@@ -22,8 +22,6 @@ TEST_F(TestMicroByteMutex, mutexFunctionsTest)
 {
     MicroByteCpuTest cpuTest;
 
-    microbyte::cpuSet(&cpuTest);
-
     ThreadScheduler *scheduler = &ThreadScheduler::init();
 
     EXPECT_NE(scheduler, nullptr);
